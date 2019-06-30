@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace smush
 {
-    class Vector3
+    public class Vector3
     {
         public double X = 0, Y = 0, Z = 0;
 
@@ -23,9 +23,32 @@ namespace smush
             Z = nz;
         }
 
+        public static Vector3 operator +(Vector3 a, Vector3 b)
+        {
+            return new Vector3(a.X + b.X, a.Y + b.Y, a.Z + b.Z);
+        }
+
         public static Vector3 operator -(Vector3 a, Vector3 b)
         {
             return new Vector3(a.X - b.X, a.Y - b.Y, a.Z - b.Z);
+        }
+
+        public static Vector3 operator /(Vector3 a, int b)
+        {
+            return new Vector3(a.X / b, a.Y / b, a.Z / b);
+        }
+
+        public static double Dot(Vector3 a, Vector3 b)
+        {
+            return a.X * b.X + a.Y * b.Y + a.Z * b.Z;
+        }
+
+        public void Normalize()
+        {
+            double mag = Math.Sqrt(X * X + Y * Y + Z * Z);
+            X /= mag;
+            Y /= mag;
+            Z /= mag;
         }
 
         public static Vector3 TransformCoordinate(Vector3 coord, Matrix mat)

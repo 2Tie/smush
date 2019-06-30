@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace smush
 {
-    class Vector4
+    public class Vector4
     {
         public double X = 0, Y = 0, Z = 0, W = 0;
 

@@ -38,14 +38,14 @@ namespace smush
 
             dev = new Device(drawBuffer);
 
-            cub.Vertices[0] = new Vector3(-1, 1, 1);
-            cub.Vertices[1] = new Vector3(1, 1, 1);
-            cub.Vertices[2] = new Vector3(-1, -1, 1);
-            cub.Vertices[3] = new Vector3(1, -1, 1);
-            cub.Vertices[4] = new Vector3(-1, 1, -1);
-            cub.Vertices[5] = new Vector3(1, 1, -1);
-            cub.Vertices[6] = new Vector3(1, -1, -1);
-            cub.Vertices[7] = new Vector3(-1, -1, -1);
+            cub.Vertices[0] = new Vertex { Coordinates = new Vector3(-1, 1, 1), Normal = new Vector3(-0.57, 0.57, 0.57) };
+            cub.Vertices[1] = new Vertex { Coordinates = new Vector3(1, 1, 1), Normal = new Vector3(0.57, 0.57, 0.57) };
+            cub.Vertices[2] = new Vertex { Coordinates = new Vector3(-1, -1, 1), Normal = new Vector3(-0.57, -0.57, 0.57) };
+            cub.Vertices[3] = new Vertex { Coordinates = new Vector3(1, -1, 1), Normal = new Vector3(0.57, -0.57, 0.57) };
+            cub.Vertices[4] = new Vertex { Coordinates = new Vector3(-1, 1, -1), Normal = new Vector3(-0.57, 0.57, -0.57) };
+            cub.Vertices[5] = new Vertex { Coordinates = new Vector3(1, 1, -1), Normal = new Vector3(0.57, 0.57, -0.57) };
+            cub.Vertices[6] = new Vertex { Coordinates = new Vector3(1, -1, -1), Normal = new Vector3(0.57, -0.57, -0.57) };
+            cub.Vertices[7] = new Vertex { Coordinates = new Vector3(-1, -1, -1), Normal = new Vector3(-0.57, -0.57, -0.57) };
 
             cub.Faces[0] = new Tri { A = 0, B = 1, C = 2 };
             cub.Faces[1] = new Tri { A = 1, B = 2, C = 3 };
@@ -61,7 +61,7 @@ namespace smush
             cub.Faces[10] = new Tri { A = 4, B = 5, C = 6 };
             cub.Faces[11] = new Tri { A = 4, B = 6, C = 7 };
 
-            cam.Position = new Vector3(0, 0, 10.0f);
+            cam.Position = new Vector3(0, 0, 15.0f);
             cam.TargetPos = Vector3.Zero;
         }
 
@@ -73,7 +73,7 @@ namespace smush
                 startTime = timer.ElapsedMilliseconds;
                 //draw temp BG so bleeding doesn't occur
                 drawBuffer.FillRectangle(new SolidBrush(Color.Black), this.ClientRectangle);
-
+                dev.Clear();
 
                 cub.Rotation = new Vector3(cub.Rotation.X + 0.01f, cub.Rotation.Y + 0.01f, cub.Rotation.Z);
 

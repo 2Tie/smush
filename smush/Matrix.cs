@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace smush
 {
-    class Matrix
+    public class Matrix
     {
         double[,] points { get; set; }
 

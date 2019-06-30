@@ -11,16 +11,35 @@ namespace smush
     {
         Graphics buffer;
         double[] depthBuf;
+        int bufWidth;
+        int bufHeight;
+
+        public struct ScanLineData
+        {
+            public int currentY;
+            public double ndotl1;
+            public double ndotl2;
+            public double ndotl3;
+            public double ndotl4;
+        }
 
         public Device(Graphics Buffer)
         {
             this.buffer = Buffer;
-            depthBuf = new double[480 * 360];
+            bufWidth = (int)buffer.VisibleClipBounds.Width;
+            bufHeight = (int)buffer.VisibleClipBounds.Height;
+            depthBuf = new double[bufWidth * bufHeight];
+        }
+
+        public void Clear()
+        {
+            for (int i = 0; i < depthBuf.Length; i++)
+                depthBuf[i] = double.MaxValue;
         }
 
         public void drawPoint(double x, double y, double z, Color c)
         {
-            int ind = (int)(y * 480 + x);
+            int ind = (int)(y * bufWidth + x);
             if (z < depthBuf[ind])
                 return;
             depthBuf[ind] = z;
@@ -33,10 +52,16 @@ namespace smush
             buffer.FillRectangle(new SolidBrush(c), (int)x, (int)y, 1, 1);
         }
 
-        public Vector3 Project(Vector3 coord, Matrix transMat)
+        public Vertex Project(Vertex vert, Matrix transMat, Matrix world)
         {
-            var point = Vector3.TransformCoordinate(coord, transMat);
-            return new Vector3(point.X + 240, -1*point.Y + 180, point.Z);
+            var point2D = Vector3.TransformCoordinate(vert.Coordinates, transMat);
+            var point3D = Vector3.TransformCoordinate(point2D, world);
+            var normal3D = Vector3.TransformCoordinate(vert.Normal, world);
+            return new Vertex {
+                Coordinates = new Vector3(point2D.X + bufWidth / 2, -1 * point2D.Y + bufHeight / 2, point2D.Z),
+                Normal = normal3D,
+                WorldCoordinates = point3D
+            };
         }
         public void Render(Camera cam, params Mesh[] meshes)
         {
@@ -66,9 +91,9 @@ namespace smush
                 int f = 0;
                 foreach (var face in mesh.Faces)
                 {
-                    Vector3 pix1 = Project(mesh.Vertices[face.A], tf);
-                    Vector3 pix2 = Project(mesh.Vertices[face.B], tf);
-                    Vector3 pix3 = Project(mesh.Vertices[face.C], tf);
+                    Vertex pix1 = Project(mesh.Vertices[face.A], tf, worldmat);
+                    Vertex pix2 = Project(mesh.Vertices[face.B], tf, worldmat);
+                    Vertex pix3 = Project(mesh.Vertices[face.C], tf, worldmat);
 
                     Color c = f % 2 == 1 ? Color.WhiteSmoke : Color.Turquoise;
 
@@ -83,9 +108,23 @@ namespace smush
             }
         }
 
-        public void drawTri(Vector3 p1, Vector3 p2, Vector3 p3, Color c)
+        double ComputeNDotL(Vector3 vertex, Vector3 normal, Vector3 lightPosition)
         {
-            //sort by y
+            Vector3 lightNormal = lightPosition - vertex;
+
+            normal.Normalize();
+            lightNormal.Normalize();
+
+            return Math.Max(0, Vector3.Dot(normal, lightNormal));
+        }
+
+        public void drawTri(Vertex v1, Vertex v2, Vertex v3, Color c)
+        {
+            Vector3 p1 = v1.Coordinates;
+            Vector3 p2 = v2.Coordinates;
+            Vector3 p3 = v3.Coordinates;
+
+            //sort triangles by y
             if (p1.Y > p2.Y)
             {
                 var temp = p2;
@@ -104,8 +143,25 @@ namespace smush
                 p2 = p1;
                 p1 = temp;
             }
+
+            v1.Coordinates = p1;
+            v2.Coordinates = p2;
+            v3.Coordinates = p3;
+
+            //face normal
+            Vector3 faceNormal = (v1.Normal + v2.Normal + v3.Normal) / 3;
+            Vector3 faceCenter = (v1.WorldCoordinates + v2.WorldCoordinates + v3.WorldCoordinates) / 3;
+
+            Vector3 LightCoords = new Vector3(0, 10, 10);
+
+            double ndotl = ComputeNDotL(faceCenter, faceNormal, LightCoords);
+
+            var data = new ScanLineData { ndotl1 = ndotl };
+
+
             //inverse slopes
             double dP1P2, dP1P3;
+
             if (p2.Y - p1.Y > 0)
                 dP1P2 = (p2.X - p1.X) / (p2.Y - p1.Y);
             else
@@ -115,17 +171,19 @@ namespace smush
                 dP1P3 = (p3.X - p1.X) / (p3.Y - p1.Y);
             else
                 dP1P3 = 0;
+
             if (dP1P2 > dP1P3)
             {
                 for (var y = (int)p1.Y; y <= (int)p3.Y; y++)
                 {
+                    data.currentY = y;
                     if (y < p2.Y)
                     {
-                        drawScanLine(y, p1, p3, p1, p2, c);
+                        drawScanLine(data, v1, v3, v1, v2, c);
                     }
                     else
                     {
-                        drawScanLine(y, p1, p3, p2, p3, c);
+                        drawScanLine(data, v1, v3, v2, v3, c);
                     }
                 }
             }
@@ -133,23 +191,30 @@ namespace smush
             {
                 for (var y = (int)p1.Y; y <= (int)p3.Y; y++)
                 {
+                    data.currentY = y;
                     if (y < p2.Y)
                     {
-                        drawScanLine(y, p1, p2, p1, p3, c);
+                        drawScanLine(data, v1, v2, v1, v3, c);
                     }
                     else
                     {
-                        drawScanLine(y, p2, p3, p1, p3, c);
+                        drawScanLine(data, v2, v3, v1, v3, c);
                     }
                 }
             }
         }
 
         //draw scanline of a triangle. p1 and p2 is left line, p3 and p4 is right. y is the vertical slice of it.
-        public void drawScanLine(int y, Vector3 p1, Vector3 p2, Vector3 p3, Vector3 p4, Color c)
+        public void drawScanLine(ScanLineData data, Vertex v1, Vertex v2, Vertex v3, Vertex v4, Color c)
         {
-            var gradient1 = p1.Y != p2.Y ? (y - p1.Y) / (p2.Y - p1.Y) : 1;
-            var gradient2 = p3.Y != p4.Y ? (y - p3.Y) / (p4.Y - p3.Y) : 1;
+            Vector3 p1 = v1.Coordinates;
+            Vector3 p2 = v2.Coordinates;
+            Vector3 p3 = v3.Coordinates;
+            Vector3 p4 = v4.Coordinates;
+
+
+            var gradient1 = p1.Y != p2.Y ? (data.currentY - p1.Y) / (p2.Y - p1.Y) : 1;
+            var gradient2 = p3.Y != p4.Y ? (data.currentY - p3.Y) / (p4.Y - p3.Y) : 1;
 
             int sx = (int)interpolate(p1.X, p2.X, gradient1);
             int ex = (int)interpolate(p3.X, p4.X, gradient2);
@@ -159,9 +224,10 @@ namespace smush
 
             for (var x = sx; x < ex; x++)
             {
-                double zg = (x - sx) / (ex - sx);
+                double zg = (x - sx) / (double)(ex - sx);
                 double z = interpolate(sz, ez, zg);
-                drawPoint(x, y, z, c);
+                Color shadedColor = Color.FromArgb(c.A, (int)(c.R * data.ndotl1), (int)(c.G * data.ndotl1), (int)(c.B * data.ndotl1));
+                drawPoint(x, data.currentY, z, c);
             }
         }
 
@@ -178,7 +244,7 @@ namespace smush
         //interpolated recursion line
         public void drawIEdge(Vector2 p1, Vector2 p2)
         {
-            if (Math.Sqrt(Math.Pow((p2.X - p1.X), 2) + Math.Pow((p2.Y - p1.Y), 2)) < 1) //if small distance, return
+            if (Math.Pow((p2.X - p1.X), 2) + Math.Pow((p2.Y - p1.Y), 2) < 1) //if small distance, return
                 return;
             Vector2 mid = new Vector2(p1.X + (p2.X - p1.X) / 2, p1.Y + (p2.Y - p1.Y) / 2);
             Blit(mid.X, mid.Y, Color.WhiteSmoke);
